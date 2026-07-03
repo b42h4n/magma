@@ -1,0 +1,96 @@
+import re
+
+BUFFER_SIZE = 256
+
+ccode = ['#include <stddef.h>',
+'',
+'void printchar(char c) {',
+'    __asm__ volatile (',
+'        "mov $1, %%rax\\n"',
+'        "mov $1, %%rdi\\n"',
+'        "mov %0, %%rsi\\n"',
+'        "mov $1, %%rdx\\n"',
+'        "syscall\\n"',
+'        :',
+'        : "r"(&c)',
+'        : "rax", "rdi", "rsi", "rdx"',
+'    );',
+'}',
+'',
+'void readchar(char *c) {',
+'    __asm__ volatile (',
+'        "mov $0, %%rax\\n"',
+'        "mov $0, %%rdi\\n"',
+'        "mov %0, %%rsi\\n"',
+'        "mov $1, %%rdx\\n"',
+'        "syscall\\n"',
+'        :',
+'        : "r"(c)',
+'        : "rax", "rdi", "rsi", "rdx"',
+'    );',
+'}',
+'',
+f'void readline(char *buf, size_t max_len) {{',
+'    size_t i = 0;',
+'    char c;',
+'    while (i < max_len - 1) {',
+'        readchar(&c);',
+'        if (c == \'\\n\') break;',
+'        buf[i] = c;',
+'        i++;',
+'    }',
+'    buf[i] = \'\\0\';',
+'}',
+'',
+'int main() {'
+]
+
+lines = []
+declared_vars = set()
+
+WRITE_RE = re.compile(r'^\s*write\s*\(\s*"((?:[^"\\]|\\.)*)"\s*\)\s*$')
+READ_RE = re.compile(r'^\s*read\s*\(\s*"([a-zA-Z_][a-zA-Z0-9_]*)"\s*\)\s*$')
+
+
+def translate(line):
+    line = line.strip()
+    if not line:
+        return 0
+
+    m = WRITE_RE.match(line)
+    if m:
+        string_content = m.group(1).encode().decode('unicode_escape')
+        for ch in string_content:
+            escaped = ch.replace("\\", "\\\\").replace("'", "\\'")
+            ccode.append(f"    printchar('{escaped}');")
+        return 0
+
+    m = READ_RE.match(line)
+    if m:
+        varname = m.group(1)
+        if varname not in declared_vars:
+            ccode.append(f"    char {varname}[{BUFFER_SIZE}];")
+            declared_vars.add(varname)
+        ccode.append(f"    readline({varname}, {BUFFER_SIZE});")
+        return 0
+
+    print(f"Syntax Error: invalid statement '{line}'")
+    return 1
+
+
+try:
+    while True:
+        lines.append(input("> "))
+except EOFError:
+    error_occurred = False
+    for line in lines:
+        if translate(line) != 0:
+            error_occurred = True
+
+    if error_occurred:
+        print("Compilation aborted due to syntax errors.")
+    else:
+        ccode.append("    return 0;")
+        ccode.append("}")
+        for line in ccode:
+            print(line)
