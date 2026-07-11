@@ -3,7 +3,7 @@ import argparse
 import colorama
 from datetime import *
 
-ver="0.2"
+ver="0.3"
 
 BUFFER_SIZE = 256
 
@@ -44,17 +44,18 @@ ccode = [
 '    int false = 0;',
 ]
 
-lines = []
 declared_vars = set()
 anon_var_count = 0
 
+# Keywords
 WRITE_RE = re.compile(r'^\s*write\s*\(\s*(?:"((?:[^"\\]|\\.)*)"|([a-zA-Z_][a-zA-Z0-9_]*))\s*\)\s*$')
 READ_RE = re.compile(r'^\s*read\s*\(\s*(?:"((?:[^"\\]|\\.)*)"|([a-zA-Z_][a-zA-Z0-9_]*))\s*\)\s*$')
 INT_RE = re.compile(r'^\s*int\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([0-9]+)\s*$')
 STR_RE = re.compile(r'^\s*str\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*"((?:[^"\\]|\\.)*)"\s*$')
 BOOL_RE = re.compile(r'^\s*bool\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(true|false)\s*$')
 FLOAT_RE = re.compile(r'^\s*float\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([0-9.]+)\s*$')
-IF_RE = re.compile(r'''^\s*if\s*\(\s*(?:("(?:[^"\\]|\\.)*")|([a-zA-Z_][a-zA-Z0-9_]*))\s*\)\s*{(.+)}$''', re.VERBOSE)
+IF_RE = re.compile(r'^\s*if\s*\(\s*(.+?)\s*\)\s*\{(.*)\}\s*$', re.DOTALL)
+
 
 def helper_print_string_literal(text, indent_str="    "):
     content = text.encode().decode('unicode_escape')
@@ -67,13 +68,82 @@ def helper_print_string_literal(text, indent_str="    "):
             escaped = ch.replace("\\", "\\\\").replace("'", "\\'")
         ccode.append(f"{indent_str}printchar('{escaped}');")
 
+
+def split_statements(text):
+    statements = []
+    buf = []
+    depth = 0
+    in_string = False
+    escape = False
+    i = 0
+    n = len(text)
+
+    while i < n:
+        ch = text[i]
+
+        if in_string:
+            buf.append(ch)
+            if escape:
+                escape = False
+            elif ch == '\\':
+                escape = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+
+        if ch == '"':
+            in_string = True
+            buf.append(ch)
+            i += 1
+            continue
+
+        if ch == '{':
+            depth += 1
+            buf.append(ch)
+            i += 1
+            continue
+
+        if ch == '}':
+            depth -= 1
+            buf.append(ch)
+            i += 1
+            if depth <= 0:
+                depth = 0
+                stmt = "".join(buf).strip()
+                if stmt:
+                    statements.append(stmt)
+                buf = []
+            continue
+
+        if ch == '\n':
+            if depth == 0:
+                stmt = "".join(buf).strip()
+                if stmt:
+                    statements.append(stmt)
+                buf = []
+            else:
+                buf.append(' ')
+            i += 1
+            continue
+
+        buf.append(ch)
+        i += 1
+
+    tail = "".join(buf).strip()
+    if tail:
+        statements.append(tail)
+
+    return statements
+
+
 def translate(line, depth=1):
     global anon_var_count
     line = line.strip()
     if not line:
         return 0
     indent = "    " * depth
-    
+
     m = BOOL_RE.match(line)
     if m:
         namevar = m.group(1)
@@ -123,14 +193,14 @@ def translate(line, depth=1):
         var_name = m.group(2)
 
         if prompt_text is not None:
-            helper_print_string_literal(prompt_text, indent) 
-            
+            helper_print_string_literal(prompt_text, indent)
+
             anon_var = f"anon_buf_{anon_var_count}"
             anon_var_count += 1
-            
+
             ccode.append(f"{indent}char {anon_var}[{BUFFER_SIZE}];")
             ccode.append(f"{indent}readline({anon_var}, {BUFFER_SIZE});")
-            
+
         elif var_name is not None:
             if var_name not in declared_vars:
                 ccode.append(f"{indent}char {var_name}[{BUFFER_SIZE}];")
@@ -140,35 +210,44 @@ def translate(line, depth=1):
 
     m = IF_RE.match(line)
     if m:
-        string_literal = m.group(1)
-        condition = m.group(2)
-        command = m.group(3)
+        condition = m.group(1)
+        body = m.group(2)
 
-        cond_expr = string_literal if string_literal is not None else condition
-        
-        ccode.append(f"{indent}if ({cond_expr}) {{")
-        inner_error = translate(command, depth + 1)
+        ccode.append(f"{indent}if ({condition}) {{")
+
+        inner_error = 0
+        for inner_stmt in split_statements(body):
+            if translate(inner_stmt, depth + 1) != 0:
+                inner_error = 1
+
         ccode.append(f"{indent}}}")
         return inner_error
 
-    print(f"Error in {file}:\n{colorama.Fore.MAGENTA}  Syntax Error{colorama.Fore.RESET}: invalid statement '{colorama.Fore.RED}{line}{colorama.Fore.RESET}'")
+    print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Syntax Error{colorama.Fore.RESET}: invalid statement '{colorama.Fore.RED}{line}{colorama.Fore.RESET}'")
     return 1
 
-try:
+
+def read_source():
     if not args:
-        while True:
-            lines.append(input("> "))
+        buf = []
+        try:
+            while True:
+                buf.append(input("> ") + "\n")
+        except EOFError:
+            pass
+        return "".join(buf)
     else:
         with open(args, "r", encoding="utf8") as t:
-            for i in t:
-                lines.append(i)
-except EOFError:
-    pass
+            return t.read()
+
+
+source_text = read_source()
+statements = split_statements(source_text)
 
 error_occurred = False
 print()
-for line in lines:
-    if translate(line) != 0:
+for stmt in statements:
+    if translate(stmt) != 0:
         error_occurred = True
 
 if error_occurred:
