@@ -1,5 +1,9 @@
 import re
 import argparse
+import colorama
+from datetime import *
+
+ver="0.2"
 
 BUFFER_SIZE = 256
 
@@ -10,6 +14,9 @@ def arguments():
     return args.my_arg if args.my_arg else None
 
 args=arguments()
+file = "main" if args == None else args
+
+print(f"{colorama.Fore.RED}Magma v{ver}{colorama.Fore.RESET} on {file}, {date.today().day}.{date.today().month}.{date.today().year}\n")
 
 ccode = [
 'void printchar(char c) {',
@@ -47,8 +54,9 @@ INT_RE = re.compile(r'^\s*int\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([0-9]+)\s*$')
 STR_RE = re.compile(r'^\s*str\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*"((?:[^"\\]|\\.)*)"\s*$')
 BOOL_RE = re.compile(r'^\s*bool\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(true|false)\s*$')
 FLOAT_RE = re.compile(r'^\s*float\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([0-9.]+)\s*$')
+IF_RE = re.compile(r'''^\s*if\s*\(\s*(?:("(?:[^"\\]|\\.)*")|([a-zA-Z_][a-zA-Z0-9_]*))\s*\)\s*{(.+)}$''', re.VERBOSE)
 
-def helper_print_string_literal(text):
+def helper_print_string_literal(text, indent_str="    "):
     content = text.encode().decode('unicode_escape')
     for ch in content:
         if ch == '\n':
@@ -57,20 +65,21 @@ def helper_print_string_literal(text):
             escaped = '\\t'
         else:
             escaped = ch.replace("\\", "\\\\").replace("'", "\\'")
-        ccode.append(f"    printchar('{escaped}');")
+        ccode.append(f"{indent_str}printchar('{escaped}');")
 
-def translate(line):
+def translate(line, depth=1):
     global anon_var_count
     line = line.strip()
     if not line:
         return 0
+    indent = "    " * depth
     
     m = BOOL_RE.match(line)
     if m:
         namevar = m.group(1)
         value = m.group(2)
         declared_vars.add(namevar)
-        ccode.append(f'    int {namevar} = {value};')
+        ccode.append(f'{indent}int {namevar} = {value};')
         return 0
 
     m = INT_RE.match(line)
@@ -78,7 +87,7 @@ def translate(line):
         namevar = m.group(1)
         value = m.group(2)
         declared_vars.add(namevar)
-        ccode.append(f"    int {namevar} = {value};")
+        ccode.append(f"{indent}int {namevar} = {value};")
         return 0
 
     m = FLOAT_RE.match(line)
@@ -86,7 +95,7 @@ def translate(line):
         namevar = m.group(1)
         value = m.group(2)
         declared_vars.add(namevar)
-        ccode.append(f"    float {namevar} = {value};")
+        ccode.append(f"{indent}float {namevar} = {value};")
         return 0
 
     m = STR_RE.match(line)
@@ -94,7 +103,7 @@ def translate(line):
         namevar = m.group(1)
         value = m.group(2)
         declared_vars.add(namevar)
-        ccode.append(f'    char * {namevar} = "{value}";')
+        ccode.append(f'{indent}char * {namevar} = "{value}";')
         return 0
 
     m = WRITE_RE.match(line)
@@ -103,9 +112,9 @@ def translate(line):
         var_name = m.group(2)
 
         if string_literal is not None:
-            helper_print_string_literal(string_literal)
+            helper_print_string_literal(string_literal, indent)
         elif var_name is not None:
-            ccode.append(f"    printstring({var_name});")
+            ccode.append(f"{indent}printstring({var_name});")
         return 0
 
     m = READ_RE.match(line)
@@ -114,22 +123,35 @@ def translate(line):
         var_name = m.group(2)
 
         if prompt_text is not None:
-            helper_print_string_literal(prompt_text) 
+            helper_print_string_literal(prompt_text, indent) 
             
             anon_var = f"anon_buf_{anon_var_count}"
             anon_var_count += 1
             
-            ccode.append(f"    char {anon_var}[{BUFFER_SIZE}];")
-            ccode.append(f"    readline({anon_var}, {BUFFER_SIZE});")
+            ccode.append(f"{indent}char {anon_var}[{BUFFER_SIZE}];")
+            ccode.append(f"{indent}readline({anon_var}, {BUFFER_SIZE});")
             
         elif var_name is not None:
             if var_name not in declared_vars:
-                ccode.append(f"    char {var_name}[{BUFFER_SIZE}];")
+                ccode.append(f"{indent}char {var_name}[{BUFFER_SIZE}];")
                 declared_vars.add(var_name)
-            ccode.append(f"    readline({var_name}, {BUFFER_SIZE});")
+            ccode.append(f"{indent}readline({var_name}, {BUFFER_SIZE});")
         return 0
 
-    print(f"\nSyntax Error: invalid statement '{line}'")
+    m = IF_RE.match(line)
+    if m:
+        string_literal = m.group(1)
+        condition = m.group(2)
+        command = m.group(3)
+
+        cond_expr = string_literal if string_literal is not None else condition
+        
+        ccode.append(f"{indent}if ({cond_expr}) {{")
+        inner_error = translate(command, depth + 1)
+        ccode.append(f"{indent}}}")
+        return inner_error
+
+    print(f"Error in {file}:\n{colorama.Fore.MAGENTA}  Syntax Error{colorama.Fore.RESET}: invalid statement '{colorama.Fore.RED}{line}{colorama.Fore.RESET}'")
     return 1
 
 try:
@@ -144,15 +166,15 @@ except EOFError:
     pass
 
 error_occurred = False
+print()
 for line in lines:
     if translate(line) != 0:
         error_occurred = True
 
 if error_occurred:
-    print("\nCompilation error.")
+    print(f"{colorama.Fore.RED}Compilation error.")
 else:
     ccode.append("    return 0;")
     ccode.append("}")
-    print("\n")
     for line in ccode:
         print(line)
