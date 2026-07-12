@@ -95,7 +95,7 @@ def check_expr_vars(expr, line_for_error):
         if name in ("true", "false"):
             continue
         if name not in declared_vars:
-            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Syntax Error{colorama.Fore.RESET}: undeclared variable '{colorama.Fore.RED}{name}{colorama.Fore.RESET}' in '{colorama.Fore.RED}{line_for_error}{colorama.Fore.RESET}'")
+            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Name Error{colorama.Fore.RESET}: undeclared variable '{colorama.Fore.RED}{name}{colorama.Fore.RESET}' in '{colorama.Fore.RED}{line_for_error}{colorama.Fore.RESET}'")
             return False
     return True
 
