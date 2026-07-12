@@ -68,8 +68,6 @@ ccode = [
 HOIST_INSERT_INDEX = len(ccode)
 
 def hoist_declaration(decl_line):
-    """Вставляет объявление переменной на уровень функции main,
-    а не в текущий блок if/while."""
     global HOIST_INSERT_INDEX
     ccode.insert(HOIST_INSERT_INDEX, decl_line)
     HOIST_INSERT_INDEX += 1
