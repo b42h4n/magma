@@ -4,8 +4,7 @@ import colorama
 from datetime import *
 import os
 
-ver="0.5"
-
+ver = "0.6"
 BUFFER_SIZE = 256
 
 def arguments():
@@ -14,12 +13,14 @@ def arguments():
     args = parser.parse_args()
     return args.my_arg if args.my_arg else None
 
-args=arguments()
-file = "main" if args == None else args
+args = arguments()
+file = "main" if args is None else args
 
+colorama.init(autoreset=True)
 print(f"{colorama.Fore.RED}Magma v{ver}{colorama.Fore.RESET} on {file}, {date.today().day}.{date.today().month}.{date.today().year}\n")
 
 ccode = [
+'#include <stdio.h>',
 'void printchar(char c) {',
 '    __asm__ volatile ("mov $1, %%rax\\n" "mov $1, %%rdi\\n" "mov %0, %%rsi\\n" "mov $1, %%rdx\\n" "syscall\\n" : : "r"(&c) : "rax", "rdi", "rsi", "rdx", "rcx", "r11");',
 '}',
@@ -40,12 +41,14 @@ ccode = [
 '    printint(ip);',
 '    printchar(\'.\');',
 '    float frac = f - (float)ip;',
-'    for (int _i = 0; _i < 6; _i++) {',
-'        frac *= 10;',
-'        int d = (int)frac;',
-'        printchar(\'0\' + (char)d);',
-'        frac -= (float)d;',
-'    }',
+'    long frac_part = (long)(frac * 1000000.0f + 0.5f);',
+'    // Вывод ведущих нулей дробной части, если они есть',
+'    long temp = frac_part;',
+'    int digits = 0;',
+'    while(temp > 0) { digits++; temp /= 10; }',
+'    if (frac_part == 0) digits = 1;',
+'    for (int _i = 0; _i < (6 - digits); _i++) { printchar(\'0\'); }',
+'    if (frac_part > 0) printint(frac_part);',
 '}',
 'void readchar(char *c) {',
 '    __asm__ volatile ("mov $0, %%rax\\n" "mov $0, %%rdi\\n" "mov %0, %%rsi\\n" "mov $1, %%rdx\\n" "syscall\\n" : : "r"(c) : "rax", "rdi", "rsi", "rdx", "rcx", "r11");',
@@ -62,8 +65,6 @@ ccode = [
 "    buf[i] = '\\0';",
 '}',
 'int main() {',
-'    int true = 1;',
-'    int false = 0;',
 ]
 
 HOIST_INSERT_INDEX = len(ccode)
@@ -73,8 +74,23 @@ def hoist_declaration(decl_line):
     ccode.insert(HOIST_INSERT_INDEX, decl_line)
     HOIST_INSERT_INDEX += 1
 
-declared_vars = {}
+declared_vars_stack = [{}]
 anon_var_count = 0
+
+def is_var_declared(name):
+    for scope in reversed(declared_vars_stack):
+        if name in scope:
+            return True
+    return False
+
+def get_var_type(name):
+    for scope in reversed(declared_vars_stack):
+        if name in scope:
+            return scope[name]
+    return None
+
+def declare_var_in_current_scope(name, var_type):
+    declared_vars_stack[-1][name] = var_type
 
 # Keywords
 WRITE_RE = re.compile(r'^\s*write\s*\(\s*(?:"((?:[^"\\]|\\.)*)"|([a-zA-Z_][a-zA-Z0-9_]*))\s*\)\s*$')
@@ -88,6 +104,7 @@ WHILE_RE = re.compile(r'^\s*while\s*\(\s*(.+?)\s*\)\s*\{(.*)\}\s*$', re.DOTALL)
 ASSIGN_STR_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*"((?:[^"\\]|\\.)*)"\s*$')
 ASSIGN_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)\s*$')
 IDENT_RE = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*')
+PASS_RE = re.compile(r'(pass|skip)')
 
 RESERVED_NAMES = {"true", "false"}
 
@@ -95,7 +112,7 @@ def check_expr_vars(expr, line_for_error):
     for name in IDENT_RE.findall(expr):
         if name in ("true", "false"):
             continue
-        if name not in declared_vars:
+        if not is_var_declared(name):
             print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Name Error{colorama.Fore.RESET}: undeclared variable '{colorama.Fore.RED}{name}{colorama.Fore.RESET}' in '{colorama.Fore.RED}{line_for_error}{colorama.Fore.RESET}'")
             return False
     return True
@@ -111,7 +128,6 @@ def helper_print_string_literal(text, indent_str="    "):
             escaped = ch.replace("\\", "\\\\").replace("'", "\\'")
         ccode.append(f"{indent_str}printchar('{escaped}');")
 
-
 def split_statements(text):
     statements = []
     buf = []
@@ -123,7 +139,6 @@ def split_statements(text):
 
     while i < n:
         ch = text[i]
-
         if in_string:
             buf.append(ch)
             if escape:
@@ -176,9 +191,7 @@ def split_statements(text):
     tail = "".join(buf).strip()
     if tail:
         statements.append(tail)
-
     return statements
-
 
 def translate(line, depth=1):
     global anon_var_count
@@ -191,37 +204,38 @@ def translate(line, depth=1):
     if m:
         namevar = m.group(1)
         value = m.group(2)
-        if namevar in declared_vars:
-            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Redefinition Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared")
+        if namevar in declared_vars_stack[-1]:
+            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Redefinition Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared in this scope")
             return 1
         if namevar in RESERVED_NAMES:
             print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Syntax Error{colorama.Fore.RESET}: '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' is a reserved name")
             return 1
-        declared_vars[namevar] = "bool"
-        ccode.append(f'{indent}int {namevar} = {value};')
+        declare_var_in_current_scope(namevar, "bool")
+        c_val = "1" if value == "true" else "0"
+        ccode.append(f'{indent}int {namevar} = {c_val};')
         return 0
 
     m = INT_RE.match(line)
     if m:
         namevar, expr = m.groups()
-        if namevar in declared_vars:
-            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Redefinition Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared")
+        if namevar in declared_vars_stack[-1]:
+            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Redefinition Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared in this scope")
             return 1
         if not check_expr_vars(expr, line):
             return 1
-        declared_vars[namevar] = "int"
+        declare_var_in_current_scope(namevar, "int")
         ccode.append(f"{indent}int {namevar} = {expr};")
         return 0
 
     m = FLOAT_RE.match(line)
     if m:
         namevar, expr = m.groups()
-        if namevar in declared_vars:
-            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Type Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared")
+        if namevar in declared_vars_stack[-1]:
+            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Redefinition Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared in this scope")
             return 1
         if not check_expr_vars(expr, line):
             return 1
-        declared_vars[namevar] = "float"
+        declare_var_in_current_scope(namevar, "float")
         ccode.append(f"{indent}float {namevar} = {expr};")
         return 0
 
@@ -229,20 +243,21 @@ def translate(line, depth=1):
     if m:
         namevar = m.group(1)
         value = m.group(2)
-        if namevar in declared_vars:
-            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Name Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared")
+        if namevar in declared_vars_stack[-1]:
+            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Redefinition Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared in this scope")
             return 1
-        declared_vars[namevar] = "str"
+        declare_var_in_current_scope(namevar, "str")
         ccode.append(f'{indent}char * {namevar} = "{value}";')
         return 0
+
     m = ASSIGN_STR_RE.match(line)
     if m:
         namevar, value = m.groups()
-        if namevar not in declared_vars:
+        if not is_var_declared(namevar):
             print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Name Error{colorama.Fore.RESET}: undeclared variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}'")
             return 1
-        if declared_vars[namevar] != "str":
-            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Type Error{colorama.Fore.RESET}: cannot assign string to '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' of type '{declared_vars[namevar]}'")
+        if get_var_type(namevar) != "str":
+            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Type Error{colorama.Fore.RESET}: cannot assign string to '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' of type '{get_var_type(namevar)}'")
             return 1
         ccode.append(f'{indent}{namevar} = "{value}";')
         return 0
@@ -250,11 +265,12 @@ def translate(line, depth=1):
     m = ASSIGN_RE.match(line)
     if m:
         namevar, expr = m.groups()
-        if namevar not in declared_vars:
+        if not is_var_declared(namevar):
             print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Name Error{colorama.Fore.RESET}: undeclared variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}'")
             return 1
-        if declared_vars[namevar] not in ("int", "float", "bool"):
-            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Type Error{colorama.Fore.RESET}: cannot assign expression to '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' of type '{declared_vars[namevar]}'")
+        v_type = get_var_type(namevar)
+        if v_type not in ("int", "float", "bool"):
+            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Type Error{colorama.Fore.RESET}: cannot assign expression to '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' of type '{v_type}'")
             return 1
         if not check_expr_vars(expr, line):
             return 1
@@ -269,11 +285,11 @@ def translate(line, depth=1):
         if string_literal is not None:
             helper_print_string_literal(string_literal, indent)
         elif var_name is not None:
-            if var_name not in declared_vars:
+            if not is_var_declared(var_name):
                 print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Name Error{colorama.Fore.RESET}: undeclared variable '{colorama.Fore.RED}{var_name}{colorama.Fore.RESET}'")
                 return 1
 
-            var_type = declared_vars[var_name]
+            var_type = get_var_type(var_name)
             if var_type == "str":
                 ccode.append(f"{indent}printstring({var_name});")
             elif var_type == "int":
@@ -291,37 +307,40 @@ def translate(line, depth=1):
 
         if prompt_text is not None:
             helper_print_string_literal(prompt_text, indent)
-
             anon_var = f"anon_buf_{anon_var_count}"
             anon_var_count += 1
-
             hoist_declaration(f"    char {anon_var}[{BUFFER_SIZE}];")
             ccode.append(f"{indent}readline({anon_var}, {BUFFER_SIZE});")
-
         elif var_name is not None:
-            if var_name not in declared_vars:
+            if not is_var_declared(var_name):
                 hoist_declaration(f"    char {var_name}[{BUFFER_SIZE}];")
-                declared_vars[var_name] = "str"
-            elif declared_vars[var_name] != "str":
-                print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Type Error{colorama.Fore.RESET}: cannot read() into '{colorama.Fore.RED}{var_name}{colorama.Fore.RESET}' of type '{declared_vars[var_name]}'")
+                declare_var_in_current_scope(var_name, "str")
+            elif get_var_type(var_name) != "str":
+                print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Type Error{colorama.Fore.RESET}: cannot read() into '{colorama.Fore.RED}{var_name}{colorama.Fore.RESET}' of type '{get_var_type(var_name)}'")
                 return 1
             ccode.append(f"{indent}readline({var_name}, {BUFFER_SIZE});")
+        return 0
+
+    m = PASS_RE.match(line)
+    if m:
+        ccode.append(f"{indent};")
         return 0
 
     m = WHILE_RE.match(line)
     if m:
         condition = m.group(1)
         body = m.group(2)
-
         if not check_expr_vars(condition, line):
             return 1
 
         ccode.append(f"{indent}while ({condition}) {{")
 
+        declared_vars_stack.append({})
         inner_error = 0
         for inner_stmt in split_statements(body):
             if translate(inner_stmt, depth + 1) != 0:
                 inner_error = 1
+        declared_vars_stack.pop()
 
         ccode.append(f"{indent}}}")
         return inner_error
@@ -330,16 +349,17 @@ def translate(line, depth=1):
     if m:
         condition = m.group(1)
         body = m.group(2)
-
         if not check_expr_vars(condition, line):
             return 1
 
         ccode.append(f"{indent}if ({condition}) {{")
 
+        declared_vars_stack.append({})
         inner_error = 0
         for inner_stmt in split_statements(body):
             if translate(inner_stmt, depth + 1) != 0:
                 inner_error = 1
+        declared_vars_stack.pop()
 
         ccode.append(f"{indent}}}")
         return inner_error
@@ -374,9 +394,21 @@ if error_occurred:
 else:
     ccode.append("    return 0;")
     ccode.append("}")
-    saveto=input("Save to file: ") or None
-    if saveto == None:
+    saveto = input("Save to file (leave empty to print): ") or None
+    if saveto is None:
         for line in ccode:
             print(line)
     else:
-        os.system(f"clang -x c - -o {saveto} << 'EOF'\n{'\n'.join(ccode)}")
+        temp_c_file = "__temp_magma_out.c"
+        try:
+            with open(temp_c_file, "w", encoding="utf8") as f_out:
+                f_out.write('\n'.join(ccode))
+            
+            exit_code = os.system(f"clang {temp_c_file} -o {saveto}")
+            if exit_code == 0:
+                print(f"{colorama.Fore.GREEN}Successfully compiled into '{saveto}'")
+            else:
+                print(f"{colorama.Fore.RED}Clang failed to compile the generated code.")
+        finally:
+            if os.path.exists(temp_c_file):
+                os.remove(temp_c_file)
