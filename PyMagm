@@ -2,8 +2,9 @@ import re
 import argparse
 import colorama
 from datetime import *
+import os
 
-ver="0.4"
+ver="0.5"
 
 BUFFER_SIZE = 256
 
@@ -191,10 +192,10 @@ def translate(line, depth=1):
         namevar = m.group(1)
         value = m.group(2)
         if namevar in declared_vars:
-            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Name Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared")
+            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Redefinition Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared")
             return 1
         if namevar in RESERVED_NAMES:
-            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Name Error{colorama.Fore.RESET}: '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' is a reserved name")
+            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Syntax Error{colorama.Fore.RESET}: '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' is a reserved name")
             return 1
         declared_vars[namevar] = "bool"
         ccode.append(f'{indent}int {namevar} = {value};')
@@ -204,7 +205,7 @@ def translate(line, depth=1):
     if m:
         namevar, expr = m.groups()
         if namevar in declared_vars:
-            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Name Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared")
+            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Redefinition Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared")
             return 1
         if not check_expr_vars(expr, line):
             return 1
@@ -216,7 +217,7 @@ def translate(line, depth=1):
     if m:
         namevar, expr = m.groups()
         if namevar in declared_vars:
-            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Name Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared")
+            print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Type Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared")
             return 1
         if not check_expr_vars(expr, line):
             return 1
@@ -359,7 +360,6 @@ def read_source():
         with open(args, "r", encoding="utf8") as t:
             return t.read()
 
-
 source_text = read_source()
 statements = split_statements(source_text)
 
@@ -374,5 +374,9 @@ if error_occurred:
 else:
     ccode.append("    return 0;")
     ccode.append("}")
-    for line in ccode:
-        print(line)
+    saveto=input("Save to file: ") or None
+    if saveto == None:
+        for line in ccode:
+            print(line)
+    else:
+        os.system(f"clang -x c - -o {saveto} << 'EOF'\n{'\n'.join(ccode)}")
