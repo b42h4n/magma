@@ -3,14 +3,32 @@ import argparse
 import colorama
 from datetime import *
 import os
+import subprocess
+import sys
 
 colorama.init()
 
-ver = "1.0"
+ver = "1.1"
+major = False
 BUFFER_SIZE = 256
 
 def rgb(r, g, b):
     return f"\033[38;2;{r};{g};{b}m"
+
+cake=f"""{colorama.Fore.RED}All the cakes already have been eaten! :(""" if not major else f"""{colorama.Fore.RED}⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢀⡞⣧⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀{colorama.Fore.WHITE}⣀⣀⣀{colorama.Fore.RED}⣳⣋{colorama.Fore.WHITE}⣀⣀⡀⠀⠀⠀
+{colorama.Fore.WHITE}⠀⠀⠀⢸⡿⢯⣍⡉⣉⣩⠿⢻⠀⠀⠀
+⠀⠀⣤⡼⠧⠤⠬⠭⠭⠤⠤⠼⣤⡄⠀{rgb(142,102,68)}
+⠀⠀⣿⣠⣤⣰⣆⣠⣄⣴⣀⣶⣠⡇⠀
+⠀ {rgb(142,102,68)}⣿⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀{rgb(142,102,68)}⡇"""
+
+def is_float(value):
+    try:
+        float(value)
+        return True
+    except ValueError:
+        return False
 
 def arguments():
     parser = argparse.ArgumentParser(description="Argument check")
@@ -32,36 +50,57 @@ if not args.filename:
 ccode = [
 '#include <stdio.h>',
 'void printchar(char c) {',
-'    __asm__ volatile ("mov $1, %%rax\\n" "mov $1, %%rdi\\n" "mov %0, %%rsi\\n" "mov $1, %%rdx\\n" "syscall\\n" : : "r"(&c) : "rax", "rdi", "rsi", "rdx", "rcx", "r11");',
+'    char buf = c;',
+'    __asm__ volatile (',
+'        "mov $1, %%rax\\n"',
+'        "mov $1, %%rdi\\n"',
+'        "leaq %0, %%rsi\\n"',
+'        "mov $1, %%rdx\\n"',
+'        "syscall\\n"',
+'        :',
+'        : "m"(buf)',
+'        : "rax", "rdi", "rsi", "rdx", "rcx", "r11"',
+'    );',
 '}',
 'void printstring(const char *str) {',
-'    while (*str) { printchar(*str); str++; }',
+'    while (*str) { ',
+'        printchar(*str);' ,
+'        str++; ',
+'    }',
 '}',
 'void printint(long n) {',
-'    if (n < 0) { printchar(\'-\'); n = -n; }',
+"    if (n < 0) { printchar('-'); n = -n; }",
 '    if (n >= 10) { printint(n / 10); }',
-'    printchar(\'0\' + (char)(n % 10));',
+"    printchar('0' + (char)(n % 10));",
 '}',
 'void printbool(int b) {',
 '    if (b) { printstring("true"); } else { printstring("false"); }',
 '}',
 'void printfloat(float f) {',
-'    if (f < 0) { printchar(\'-\'); f = -f; }',
+"    if (f < 0) { printchar('-'); f = -f; }",
 '    long ip = (long)f;',
 '    printint(ip);',
-'    printchar(\'.\');',
+"    printchar('.');",
 '    float frac = f - (float)ip;',
 '    long frac_part = (long)(frac * 1000000.0f + 0.5f);',
-'    // Вывод ведущих нулей дробной части, если они есть',
 '    long temp = frac_part;',
 '    int digits = 0;',
 '    while(temp > 0) { digits++; temp /= 10; }',
 '    if (frac_part == 0) digits = 1;',
-'    for (int _i = 0; _i < (6 - digits); _i++) { printchar(\'0\'); }',
+"    for (int _i = 0; _i < (6 - digits); _i++) { printchar('0');}",
 '    if (frac_part > 0) printint(frac_part);',
 '}',
 'void readchar(char *c) {',
-'    __asm__ volatile ("mov $0, %%rax\\n" "mov $0, %%rdi\\n" "mov %0, %%rsi\\n" "mov $1, %%rdx\\n" "syscall\\n" : : "r"(c) : "rax", "rdi", "rsi", "rdx", "rcx", "r11");',
+'    __asm__ volatile (',
+'        "mov $0, %%rax\\n"',
+'        "mov $0, %%rdi\\n"',
+'        "mov %0, %%rsi\\n"',
+'        "mov $1, %%rdx\\n"',
+'        "syscall\\n"',
+'        :',
+'        : "r"(c)',
+'        : "rax", "rdi", "rsi", "rdx", "rcx", "r11"',
+'    );',
 '}',
 'void readline(char *buf, unsigned long max_len) {',
 '    unsigned long i = 0;',
@@ -74,7 +113,26 @@ ccode = [
 '    }',
 "    buf[i] = '\\0';",
 '}',
+'long str_to_int(const char *s) {',
+'    long result = 0;',
+'    int neg = 0;',
+"    if (*s == '-') { neg = 1; s++; }",
+"    while (*s >= '0' && *s <= '9') {",
+"        result = result * 10 + (*s - '0');",
+'        s++;',
+'    }',
+'    return neg ? -result : result;',
+'}',
+'int str_eq(const char *a, const char *b) {',
+'    while (*a && *b) {',
+'        if (*a != *b) return 0;',
+'        a++; b++;',
+'    }',
+'    return *a == *b;',
+'}',
 'int main() {',
+'int true = 1;',
+'int false = 0;'
 ]
 
 HOIST_INSERT_INDEX = len(ccode)
@@ -115,12 +173,54 @@ ASSIGN_STR_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*"((?:[^"\\]|\\.)
 ASSIGN_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)\s*$')
 IDENT_RE = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*')
 PASS_RE = re.compile(r'^\s*(pass|skip)\s*$')
+RETURN_RE = re.compile(r'^\s*return\s+([a-zA-Z0-9_]+)\s*$')
+READ_CALL_RE = re.compile(r'read\s*\(\s*(?:"((?:[^"\\]|\\.)*)"|([a-zA-Z_][a-zA-Z0-9_]*))\s*\)')
+KNOWN_FUNCS = {"atoi", "str_eq", "str_to_int"}
+STR_EQ_RE = re.compile(r'^(.+?)\s*==\s*(.+)$')
+STR_NEQ_RE = re.compile(r'^(.+?)\s*!=\s*(.+)$')
 
 RESERVED_NAMES = {"true", "false"}
 
+def is_strlike(x):
+    x = x.strip()
+    if x.startswith('"'):
+        return True
+    if IDENT_RE.fullmatch(x) and get_var_type(x) == "str":
+        return True
+    return False
+
+def convert_clause(clause):
+    stripped = strip_outer_parens(clause)
+
+    m = STR_NEQ_RE.match(stripped)
+    if m:
+        left, right = m.group(1).strip(), m.group(2).strip()
+        if is_strlike(left) or is_strlike(right):
+            return f"!str_eq({left}, {right})"
+        return clause
+
+    m = STR_EQ_RE.match(stripped)
+    if m:
+        left, right = m.group(1).strip(), m.group(2).strip()
+        if is_strlike(left) or is_strlike(right):
+            return f"str_eq({left}, {right})"
+        return clause
+
+    return clause
+
+def convert_condition(condition, indent):
+    condition = extract_reads(condition, indent)
+    clauses, ops = split_logical(condition)
+    converted = [convert_clause(c) for c in clauses]
+
+    result = converted[0]
+    for op, c in zip(ops, converted[1:]):
+        result += f" {op} {c}"
+    return result
+
 def check_expr_vars(expr, line_for_error):
     for name in IDENT_RE.findall(expr):
-        if name in ("true", "false"):
+        if name in ("true", "false") or name in KNOWN_FUNCS:
             continue
         if not is_var_declared(name):
             print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Name Error{colorama.Fore.RESET}: undeclared variable '{colorama.Fore.RED}{name}{colorama.Fore.RESET}' in '{colorama.Fore.RED}{line_for_error}{colorama.Fore.RESET}'")
@@ -152,6 +252,34 @@ def helper_print_string_literal(text, indent_str="    "):
     for ch in result_chars:
         for b in ch.encode('utf-8'):
             ccode.append(f"{indent_str}printchar((char){b});")
+
+def extract_reads(expr, indent):
+    global anon_var_count
+
+    def repl(m):
+        global anon_var_count
+        prompt_text = m.group(1)
+        var_name = m.group(2)
+
+        if prompt_text is not None:
+            helper_print_string_literal(prompt_text, indent)
+        elif var_name is not None:
+            if not is_var_declared(var_name):
+                print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Name Error{colorama.Fore.RESET}: undeclared variable '{colorama.Fore.RED}{var_name}{colorama.Fore.RESET}'")
+                return m.group(0)
+            if get_var_type(var_name) != "str":
+                print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Type Error{colorama.Fore.RESET}: cannot use '{colorama.Fore.RED}{var_name}{colorama.Fore.RESET}' as read() prompt")
+                return m.group(0)
+            ccode.append(f"{indent}printstring({var_name});")
+
+        anon_var = f"anon_buf_{anon_var_count}"
+        anon_var_count += 1
+        ccode.append(f"{indent}char {anon_var}[{BUFFER_SIZE}];")
+        ccode.append(f"{indent}readline({anon_var}, {BUFFER_SIZE});")
+        declare_var_in_current_scope(anon_var, "str")
+        return anon_var
+
+    return READ_CALL_RE.sub(repl, expr)
 
 def split_statements(text):
     statements = []
@@ -218,6 +346,79 @@ def split_statements(text):
         statements.append(tail)
     return statements
 
+def split_logical(text):
+    clauses = []
+    ops = []
+    buf = []
+    depth = 0
+    in_string = False
+    escape = False
+    i = 0
+    n = len(text)
+
+    while i < n:
+        ch = text[i]
+        if in_string:
+            buf.append(ch)
+            if escape:
+                escape = False
+            elif ch == '\\':
+                escape = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+
+        if ch == '"':
+            in_string = True
+            buf.append(ch)
+            i += 1
+            continue
+
+        if ch == '(':
+            depth += 1
+            buf.append(ch)
+            i += 1
+            continue
+
+        if ch == ')':
+            depth -= 1
+            buf.append(ch)
+            i += 1
+            continue
+
+        if depth == 0 and text[i:i+2] in ('&&', '||'):
+            clauses.append("".join(buf).strip())
+            ops.append(text[i:i+2])
+            buf = []
+            i += 2
+            continue
+
+        buf.append(ch)
+        i += 1
+
+    clauses.append("".join(buf).strip())
+    return clauses, ops
+
+def strip_outer_parens(s):
+    s = s.strip()
+    while s.startswith('(') and s.endswith(')'):
+        depth = 0
+        balanced = True
+        for idx, ch in enumerate(s):
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0 and idx != len(s) - 1:
+                    balanced = False
+                    break
+        if balanced:
+            s = s[1:-1].strip()
+        else:
+            break
+    return s
+
 def translate(line, depth=1):
     global anon_var_count
     line = line.strip()
@@ -246,6 +447,11 @@ def translate(line, depth=1):
         if namevar in declared_vars_stack[-1]:
             print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Redefinition Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared in this scope")
             return 1
+        if READ_CALL_RE.fullmatch(expr.strip()):
+            expr = extract_reads(expr, indent)
+            expr = f"str_to_int({expr})"
+        else:
+            expr = extract_reads(expr, indent)
         if not check_expr_vars(expr, line):
             return 1
         declare_var_in_current_scope(namevar, "int")
@@ -273,6 +479,18 @@ def translate(line, depth=1):
             return 1
         declare_var_in_current_scope(namevar, "str")
         ccode.append(f'{indent}char * {namevar} = "{value}";')
+        return 0
+
+    m = RETURN_RE.match(line)
+    if m:
+        value = m.group(1)
+        if value == "true":
+            result = "1"
+        elif value == "false":
+            result = "0"
+        else:
+            result = value
+        ccode.append(f'{indent}return {result};')
         return 0
 
     m = ASSIGN_STR_RE.match(line)
@@ -355,10 +573,10 @@ def translate(line, depth=1):
     if m:
         condition = m.group(1)
         body = m.group(2)
+        condition = convert_condition(condition, indent)
         if not check_expr_vars(condition, line):
             return 1
-
-        ccode.append(f"{indent}while ({condition}) {{")
+        ccode.append(f"{indent}if ({condition}) {{")
 
         declared_vars_stack.append({})
         inner_error = 0
@@ -374,9 +592,9 @@ def translate(line, depth=1):
     if m:
         condition = m.group(1)
         body = m.group(2)
+        condition = convert_condition(condition, indent)
         if not check_expr_vars(condition, line):
             return 1
-
         ccode.append(f"{indent}if ({condition}) {{")
 
         declared_vars_stack.append({})
@@ -420,7 +638,6 @@ if error_occurred:
     else:
         print(f"{colorama.Fore.RED}Compilation error.")
 else:
-    ccode.append("    return 0;")
     ccode.append("}")
 
     saveto = args.o
@@ -437,21 +654,14 @@ else:
         try:
             with open(temp_c_file, "w", encoding="utf8") as f_out:
                 f_out.write('\n'.join(ccode))
-            
-            exit_code = os.system(f"clang {temp_c_file} -o {saveto}")
-            if exit_code == 0:
+
+            exit_code = subprocess.run(["gcc", '-no-pie', temp_c_file, "-o", saveto])
+            if exit_code.returncode == 0:
                 if not args.b:
                     print(f"{colorama.Fore.GREEN}Compiled file: '{saveto}'")
                 else:
-                    print(f"""{colorama.Fore.GREEN}Compiled file: '{saveto}'
-{colorama.Fore.RED}⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⢀⡞⣧⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀{colorama.Fore.WHITE}⣀⣀⣀{colorama.Fore.RED}⣳⣋{colorama.Fore.WHITE}⣀⣀⡀⠀⠀⠀
-{colorama.Fore.WHITE}⠀⠀⠀⢸⡿⢯⣍⡉⣉⣩⠿⢻⠀⠀⠀
-⠀⠀⣤⡼⠧⠤⠬⠭⠭⠤⠤⠼⠤⡄⠀{rgb(142,102,68)}
-⠀⠀⣿⣠⣤⣰⣆⣠⣄⣴⣀⣶⣠⡇⠀
-{colorama.Fore.LIGHTBLACK_EX}⠀⣀{rgb(142,102,68)}⣿{colorama.Fore.LIGHTBLACK_EX}⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀{rgb(142,102,68)}⣇{colorama.Fore.LIGHTBLACK_EX}⡀
-{colorama.Fore.RESET}Magma release {ver}!!!""")
+                    print(cake)
+                    print(f"{colorama.Fore.RED}ur on version {ver}, and it's not major update") if not major else f"magma release v{ver}"
             else:
                 if args.troll:
                     print(f"{colorama.Fore.RED}Failed to compile your code. U R FUCKING VIBECODER!")
