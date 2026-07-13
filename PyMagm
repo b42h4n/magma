@@ -8,7 +8,7 @@ import sys
 
 colorama.init()
 
-ver = "1.1"
+ver = "1.1.4"
 major = False
 BUFFER_SIZE = 256
 
@@ -129,6 +129,10 @@ ccode = [
 '        a++; b++;',
 '    }',
 '    return *a == *b;',
+'void str_copy(char *dest, const char *src) {',
+'    while (*src) { *dest = *src; dest++; src++; }',
+"    *dest = '\\0';",
+'}',
 '}',
 'int main() {',
 'int true = 1;',
@@ -466,8 +470,8 @@ def translate(line, depth=1):
             return 1
         if not check_expr_vars(expr, line):
             return 1
-        declare_var_in_current_scope(namevar, "float")
-        ccode.append(f"{indent}float {namevar} = {expr};")
+        declare_var_in_current_scope(namevar, "str")
+        ccode.append(f'{indent}char {namevar}[{BUFFER_SIZE}] = "{value}";')
         return 0
 
     m = STR_RE.match(line)
@@ -478,7 +482,7 @@ def translate(line, depth=1):
             print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Redefinition Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared in this scope")
             return 1
         declare_var_in_current_scope(namevar, "str")
-        ccode.append(f'{indent}char * {namevar} = "{value}";')
+        ccode.append(f'{indent}char {namevar} = "{value}";')
         return 0
 
     m = RETURN_RE.match(line)
@@ -502,7 +506,7 @@ def translate(line, depth=1):
         if get_var_type(namevar) != "str":
             print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Type Error{colorama.Fore.RESET}: cannot assign string to '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' of type '{get_var_type(namevar)}'")
             return 1
-        ccode.append(f'{indent}{namevar} = "{value}";')
+        ccode.append(f'{indent}str_copy({namevar}, "{value}");')
         return 0
 
     m = ASSIGN_RE.match(line)
@@ -642,7 +646,10 @@ else:
 
     saveto = args.o
     if not saveto:
-        saveto = input("Save to file: ").strip() or None
+        try: saveto = input("Save to file: ").strip() or None
+        except (EOFError, KeyboardInterrupt):
+            print()
+            saveto=None
 
     if saveto is None:
         if args.troll:
