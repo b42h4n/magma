@@ -4,20 +4,30 @@ import colorama
 from datetime import *
 import os
 
-ver = "0.6"
+colorama.init()
+
+ver = "1.0"
 BUFFER_SIZE = 256
+
+def rgb(r, g, b):
+    return f"\033[38;2;{r};{g};{b}m"
 
 def arguments():
     parser = argparse.ArgumentParser(description="Argument check")
-    parser.add_argument('my_arg', nargs='?', default=None)
+    parser.add_argument('filename', nargs='?', default=None)
+    parser.add_argument('-o', help="output file name")
+    parser.add_argument('-b', action='store_true', help="birthday mode!")
+    parser.add_argument('--troll', action='store_true', help="trolling mode")
+    
     args = parser.parse_args()
-    return args.my_arg if args.my_arg else None
+    return args
 
 args = arguments()
-file = "main" if args is None else args
+file = "main"
 
 colorama.init(autoreset=True)
-print(f"{colorama.Fore.RED}Magma v{ver}{colorama.Fore.RESET} on {file}, {date.today().day}.{date.today().month}.{date.today().year}\n")
+if not args.filename:
+    print(f"{colorama.Fore.RED}Magma v{ver}{colorama.Fore.RESET} on {file}, {date.today().day}.{date.today().month}.{date.today().year}\n")
 
 ccode = [
 '#include <stdio.h>',
@@ -104,7 +114,7 @@ WHILE_RE = re.compile(r'^\s*while\s*\(\s*(.+?)\s*\)\s*\{(.*)\}\s*$', re.DOTALL)
 ASSIGN_STR_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*"((?:[^"\\]|\\.)*)"\s*$')
 ASSIGN_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)\s*$')
 IDENT_RE = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*')
-PASS_RE = re.compile(r'(pass|skip)')
+PASS_RE = re.compile(r'^\s*(pass|skip)\s*$')
 
 RESERVED_NAMES = {"true", "false"}
 
@@ -117,16 +127,31 @@ def check_expr_vars(expr, line_for_error):
             return False
     return True
 
+ESCAPE_MAP = {
+    'n': '\n',
+    't': '\t',
+    'r': '\r',
+    '0': '\0',
+    '\\': '\\',
+    '"': '"',
+}
+
 def helper_print_string_literal(text, indent_str="    "):
-    content = text.encode().decode('unicode_escape')
-    for ch in content:
-        if ch == '\n':
-            escaped = '\\n'
-        elif ch == '\t':
-            escaped = '\\t'
-        else:
-            escaped = ch.replace("\\", "\\\\").replace("'", "\\'")
-        ccode.append(f"{indent_str}printchar('{escaped}');")
+    result_chars = []
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if ch == '\\' and i + 1 < n and text[i + 1] in ESCAPE_MAP:
+            result_chars.append(ESCAPE_MAP[text[i + 1]])
+            i += 2
+            continue
+        result_chars.append(ch)
+        i += 1
+
+    for ch in result_chars:
+        for b in ch.encode('utf-8'):
+            ccode.append(f"{indent_str}printchar((char){b});")
 
 def split_statements(text):
     statements = []
@@ -309,11 +334,11 @@ def translate(line, depth=1):
             helper_print_string_literal(prompt_text, indent)
             anon_var = f"anon_buf_{anon_var_count}"
             anon_var_count += 1
-            hoist_declaration(f"    char {anon_var}[{BUFFER_SIZE}];")
+            ccode.append(f"{indent}char {anon_var}[{BUFFER_SIZE}];")
             ccode.append(f"{indent}readline({anon_var}, {BUFFER_SIZE});")
         elif var_name is not None:
             if not is_var_declared(var_name):
-                hoist_declaration(f"    char {var_name}[{BUFFER_SIZE}];")
+                ccode.append(f"{indent}char {var_name}[{BUFFER_SIZE}];")
                 declare_var_in_current_scope(var_name, "str")
             elif get_var_type(var_name) != "str":
                 print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Type Error{colorama.Fore.RESET}: cannot read() into '{colorama.Fore.RED}{var_name}{colorama.Fore.RESET}' of type '{get_var_type(var_name)}'")
@@ -368,7 +393,7 @@ def translate(line, depth=1):
     return 1
 
 def read_source():
-    if not args:
+    if not args.filename:
         buf = []
         try:
             while True:
@@ -377,7 +402,7 @@ def read_source():
             pass
         return "".join(buf)
     else:
-        with open(args, "r", encoding="utf8") as t:
+        with open(args.filename, "r", encoding="utf8") as t:
             return t.read()
 
 source_text = read_source()
@@ -390,14 +415,23 @@ for stmt in statements:
         error_occurred = True
 
 if error_occurred:
-    print(f"{colorama.Fore.RED}Compilation error.")
+    if args.troll:
+        print(f"{colorama.Fore.RED}READ A DOCS!")
+    else:
+        print(f"{colorama.Fore.RED}Compilation error.")
 else:
     ccode.append("    return 0;")
     ccode.append("}")
-    saveto = input("Save to file (leave empty to print): ") or None
+
+    saveto = args.o
+    if not saveto:
+        saveto = input("Save to file: ").strip() or None
+
     if saveto is None:
-        for line in ccode:
-            print(line)
+        if args.troll:
+            print(f"{colorama.Fore.RED}R u so fucking stupid that you can't come up with a name for compiled file?")
+        else:
+            print(f"{colorama.Fore.RED}Compiled file name can't be empty!")
     else:
         temp_c_file = "__temp_magma_out.c"
         try:
@@ -406,9 +440,23 @@ else:
             
             exit_code = os.system(f"clang {temp_c_file} -o {saveto}")
             if exit_code == 0:
-                print(f"{colorama.Fore.GREEN}Successfully compiled into '{saveto}'")
+                if not args.b:
+                    print(f"{colorama.Fore.GREEN}Compiled file: '{saveto}'")
+                else:
+                    print(f"""{colorama.Fore.GREEN}Compiled file: '{saveto}'
+{colorama.Fore.RED}⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢀⡞⣧⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀{colorama.Fore.WHITE}⣀⣀⣀{colorama.Fore.RED}⣳⣋{colorama.Fore.WHITE}⣀⣀⡀⠀⠀⠀
+{colorama.Fore.WHITE}⠀⠀⠀⢸⡿⢯⣍⡉⣉⣩⠿⢻⠀⠀⠀
+⠀⠀⣤⡼⠧⠤⠬⠭⠭⠤⠤⠼⠤⡄⠀{rgb(142,102,68)}
+⠀⠀⣿⣠⣤⣰⣆⣠⣄⣴⣀⣶⣠⡇⠀
+{colorama.Fore.LIGHTBLACK_EX}⠀⣀{rgb(142,102,68)}⣿{colorama.Fore.LIGHTBLACK_EX}⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀{rgb(142,102,68)}⣇{colorama.Fore.LIGHTBLACK_EX}⡀
+{colorama.Fore.RESET}Magma release {ver}!!!""")
             else:
-                print(f"{colorama.Fore.RED}Clang failed to compile the generated code.")
+                if args.troll:
+                    print(f"{colorama.Fore.RED}Failed to compile your code. U R FUCKING VIBECODER!")
+                else:
+                    print(f"{colorama.Fore.RED}Failed to compile generated code.")
         finally:
             if os.path.exists(temp_c_file):
                 os.remove(temp_c_file)
