@@ -661,7 +661,7 @@ else:
                     print(f"{colorama.Fore.GREEN}Compiled file: '{saveto}'")
                 else:
                     print(cake)
-                    print(f"{colorama.Fore.RED}ur on version {ver}, and it's not major update") if not major else f"magma release v{ver}"
+                    print(f"{colorama.Fore.RED}ur on version {ver}, and it's not major update") if not major else f"{colorama.Fore.RESET}Magma release v{ver}!!!"
             else:
                 if args.troll:
                     print(f"{colorama.Fore.RED}Failed to compile your code. U R FUCKING VIBECODER!")
