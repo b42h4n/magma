@@ -8,14 +8,24 @@ import sys
 
 colorama.init()
 
-ver = "1.1.4"
-major = False
+ver = "1.1.6"
 BUFFER_SIZE = 256
 
 def rgb(r, g, b):
     return f"\033[38;2;{r};{g};{b}m"
 
-cake=f"""{colorama.Fore.RED}All the cakes already have been eaten! :(""" if not major else f"""{colorama.Fore.RED}⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀
+def rainbow(text):
+    rainbowtext=""
+    col=0
+    colors=[rgb(255, 0, 0), rgb(255,165,0), rgb(255,255,0), rgb(0, 255, 0), rgb(0, 255, 255), rgb(0, 105, 255), rgb(159, 43, 104)]
+    for i in text:
+        rainbowtext+=f"{colors[col]}{i}"
+        col+=1
+        if col >= 7:
+            col=0
+    return rainbowtext
+
+cake=f"""{colorama.Fore.RED}⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⢀⡞⣧⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀{colorama.Fore.WHITE}⣀⣀⣀{colorama.Fore.RED}⣳⣋{colorama.Fore.WHITE}⣀⣀⡀⠀⠀⠀
 {colorama.Fore.WHITE}⠀⠀⠀⢸⡿⢯⣍⡉⣉⣩⠿⢻⠀⠀⠀
@@ -41,11 +51,14 @@ def arguments():
     return args
 
 args = arguments()
-file = "main"
+file = "main" if not args.filename else args.filename
 
 colorama.init(autoreset=True)
 if not args.filename:
-    print(f"{colorama.Fore.RED}Magma v{ver}{colorama.Fore.RESET} on {file}, {date.today().day}.{date.today().month}.{date.today().year}\n")
+    if args.troll:
+        print(f"{colorama.Fore.RED}Lagma v{ver}{colorama.Fore.RESET}, pls stop gooning to femboys\nWrite here something here if you are fucking dumbass:\n")
+    else:
+        print(f"{colorama.Fore.RED}Magma v{ver}{colorama.Fore.RESET} on {file}, {date.today().day}.{date.today().month}.{date.today().year}\n")
 
 ccode = [
 '#include <stdio.h>',
@@ -638,7 +651,7 @@ for stmt in statements:
 
 if error_occurred:
     if args.troll:
-        print(f"{colorama.Fore.RED}READ A DOCS!")
+        print(f"{colorama.Fore.RED}READ A DOCS, U FUCKING DUMBASS!")
     else:
         print(f"{colorama.Fore.RED}Compilation error.")
 else:
@@ -668,7 +681,7 @@ else:
                     print(f"{colorama.Fore.GREEN}Compiled file: '{saveto}'")
                 else:
                     print(cake)
-                    print(f"{colorama.Fore.RED}ur on version {ver}, and it's not major update") if not major else f"{colorama.Fore.RESET}Magma release v{ver}!!!"
+                    print(f"{rainbow("Happy bday!!!")}")
             else:
                 if args.troll:
                     print(f"{colorama.Fore.RED}Failed to compile your code. U R FUCKING VIBECODER!")
