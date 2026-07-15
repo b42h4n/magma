@@ -1,37 +1,20 @@
-import re
-import argparse
-import colorama
-from datetime import *
 import os
+from datetime import *
 import subprocess
 import sys
+import re
+import argparse
+import MakeCake
+try:
+    import colorama
+except ModuleNotFoundError:
+    os.system("pip install colorama --break-system-packages")
+    import colorama
 
 colorama.init()
 
-ver = "1.1.6"
+ver = "1.1.9"
 BUFFER_SIZE = 256
-
-def rgb(r, g, b):
-    return f"\033[38;2;{r};{g};{b}m"
-
-def rainbow(text):
-    rainbowtext=""
-    col=0
-    colors=[rgb(255, 0, 0), rgb(255,165,0), rgb(255,255,0), rgb(0, 255, 0), rgb(0, 255, 255), rgb(0, 105, 255), rgb(159, 43, 104)]
-    for i in text:
-        rainbowtext+=f"{colors[col]}{i}"
-        col+=1
-        if col >= 7:
-            col=0
-    return rainbowtext
-
-cake=f"""{colorama.Fore.RED}⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⢀⡞⣧⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀{colorama.Fore.WHITE}⣀⣀⣀{colorama.Fore.RED}⣳⣋{colorama.Fore.WHITE}⣀⣀⡀⠀⠀⠀
-{colorama.Fore.WHITE}⠀⠀⠀⢸⡿⢯⣍⡉⣉⣩⠿⢻⠀⠀⠀
-⠀⠀⣤⡼⠧⠤⠬⠭⠭⠤⠤⠼⣤⡄⠀{rgb(142,102,68)}
-⠀⠀⣿⣠⣤⣰⣆⣠⣄⣴⣀⣶⣠⡇⠀
-⠀ {rgb(142,102,68)}⣿⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀{rgb(142,102,68)}⡇"""
 
 def is_float(value):
     try:
@@ -148,8 +131,6 @@ ccode = [
 '}',
 '}',
 'int main() {',
-'int true = 1;',
-'int false = 0;'
 ]
 
 HOIST_INSERT_INDEX = len(ccode)
@@ -680,8 +661,7 @@ else:
                 if not args.b:
                     print(f"{colorama.Fore.GREEN}Compiled file: '{saveto}'")
                 else:
-                    print(cake)
-                    print(f"{rainbow("Happy bday!!!")}")
+                    MakeCake.mcake(MakeCake.rainbow("Happy bday!!!"))
             else:
                 if args.troll:
                     print(f"{colorama.Fore.RED}Failed to compile your code. U R FUCKING VIBECODER!")
