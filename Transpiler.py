@@ -149,6 +149,8 @@ READ_CALL_RE = re.compile(r'read\s*\(\s*(?:"((?:[^"\\]|\\.)*)"|([a-zA-Z_][a-zA-Z
 KNOWN_FUNCS = {"atoi", "str_eq", "str_to_int"}
 STR_EQ_RE = re.compile(r'^(.+?)\s*==\s*(.+)$')
 STR_NEQ_RE = re.compile(r'^(.+?)\s*!=\s*(.+)$')
+#Other
+COMM_RE=re.compile(r'^\s*//\s+([a-zA-Z0-9_]+)\s*$')
 
 RESERVED_NAMES = {"true", "false"}
 
@@ -462,6 +464,10 @@ def translate(line, depth=1):
         else:
             result = value
         ccode.append(f'{indent}return {result};')
+        return 0
+
+    m = COMM_RE.match(line)
+    if m:
         return 0
 
     m = ASSIGN_STR_RE.match(line)
