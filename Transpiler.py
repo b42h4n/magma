@@ -1,4 +1,16 @@
 import re
+import colorama
+import argparse
+
+def arguments():
+    parser = argparse.ArgumentParser(description="Argument check")
+    parser.add_argument('filename', nargs='?', default=None)
+    parser.add_argument('-o', help="output file name")
+    parser.add_argument('-b', action='store_true', help="birthday mode!")
+    parser.add_argument('--troll', action='store_true', help="trolling mode")
+    
+    args = parser.parse_args()
+    return args
 
 ccode = [
 '#include <stdio.h>',
@@ -119,17 +131,20 @@ def declare_var_in_current_scope(name, var_type):
 # Keywords
 WRITE_RE = re.compile(r'^\s*write\s*\(\s*(?:"((?:[^"\\]|\\.)*)"|([a-zA-Z_][a-zA-Z0-9_]*))\s*\)\s*$')
 READ_RE = re.compile(r'^\s*read\s*\(\s*(?:"((?:[^"\\]|\\.)*)"|([a-zA-Z_][a-zA-Z0-9_]*))\s*\)\s*$')
+PASS_RE = re.compile(r'^\s*(pass|skip)\s*$')
+RETURN_RE = re.compile(r'^\s*return\s+([a-zA-Z0-9_]+)\s*$')
+# Types
 INT_RE = re.compile(r'^\s*int\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)\s*$')
 FLOAT_RE = re.compile(r'^\s*float\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)\s*$')
 STR_RE = re.compile(r'^\s*str\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*"((?:[^"\\]|\\.)*)"\s*$')
 BOOL_RE = re.compile(r'^\s*bool\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(true|false)\s*$')
+# Structs
 IF_RE = re.compile(r'^\s*if\s*\(\s*(.+?)\s*\)\s*\{(.*)\}\s*$', re.DOTALL)
 WHILE_RE = re.compile(r'^\s*while\s*\(\s*(.+?)\s*\)\s*\{(.*)\}\s*$', re.DOTALL)
+#Helpers
 ASSIGN_STR_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*"((?:[^"\\]|\\.)*)"\s*$')
 ASSIGN_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)\s*$')
 IDENT_RE = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*')
-PASS_RE = re.compile(r'^\s*(pass|skip)\s*$')
-RETURN_RE = re.compile(r'^\s*return\s+([a-zA-Z0-9_]+)\s*$')
 READ_CALL_RE = re.compile(r'read\s*\(\s*(?:"((?:[^"\\]|\\.)*)"|([a-zA-Z_][a-zA-Z0-9_]*))\s*\)')
 KNOWN_FUNCS = {"atoi", "str_eq", "str_to_int"}
 STR_EQ_RE = re.compile(r'^(.+?)\s*==\s*(.+)$')
