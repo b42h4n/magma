@@ -2,6 +2,113 @@ import os
 from datetime import *
 import subprocess
 import sys
+import argparse
+import MakeCake
+from Transpiler import *
+
+try:
+    import colorama
+except ModuleNotFoundError:
+    os.system("pip install colorama --break-system-packages")
+    import colorama
+
+colorama.init()
+
+ver = "1.1.10"
+BUFFER_SIZE = 256
+
+def is_float(value):
+    try:
+        float(value)
+        return True
+    except ValueError:
+        return False
+
+def arguments():
+    parser = argparse.ArgumentParser(description="Argument check")
+    parser.add_argument('filename', nargs='?', default=None)
+    parser.add_argument('-o', help="output file name")
+    parser.add_argument('-b', action='store_true', help="birthday mode!")
+    parser.add_argument('--troll', action='store_true', help="trolling mode")
+    
+    args = parser.parse_args()
+    return args
+
+args = arguments()
+file = "main" if not args.filename else args.filename
+
+colorama.init(autoreset=True)
+if not args.filename:
+    if args.troll:
+        print(f"{colorama.Fore.RED}Lagma v{ver}{colorama.Fore.RESET}, pls stop gooning to femboys\nWrite here something here if you are fucking dumbass:\n")
+    else:
+        print(f"{colorama.Fore.RED}Magma v{ver}{colorama.Fore.RESET} on {file}, {date.today().day}.{date.today().month}.{date.today().year}\n")
+
+def read_source():
+    if not args.filename:
+        buf = []
+        try:
+            while True:
+                buf.append(input("> ") + "\n")
+        except (EOFError, KeyboardInterrupt):
+            pass
+        return "".join(buf)
+    else:
+        with open(args.filename, "r", encoding="utf8") as t:
+            return t.read()
+
+source_text = read_source()
+statements = split_statements(source_text)
+
+error_occurred = False
+print()
+for stmt in statements:
+    if translate(stmt) != 0:
+        error_occurred = True
+
+if error_occurred:
+    if args.troll:
+        print(f"{colorama.Fore.RED}READ A DOCS, U FUCKING DUMBASS!")
+    else:
+        print(f"{colorama.Fore.RED}Compilation error.")
+else:
+    ccode.append("}")
+
+    saveto = args.o
+    if not saveto:
+        try: saveto = input("Save to file: ").strip() or None
+        except (EOFError, KeyboardInterrupt):
+            print()
+            saveto=None
+
+    if saveto is None:
+        if args.troll:
+            print(f"{colorama.Fore.RED}R u so fucking stupid that you can't come up with a name for compiled file?")
+        else:
+            print(f"{colorama.Fore.RED}Compiled file name can't be empty!")
+    else:
+        temp_c_file = ".temp.c"
+        try:
+            with open(temp_c_file, "w", encoding="utf8") as f_out:
+                f_out.write('\n'.join(ccode))
+
+            exit_code = subprocess.run(["gcc", '-no-pie', temp_c_file, "-o", saveto])
+            if exit_code.returncode == 0:
+                if not args.b:
+                    print(f"{colorama.Fore.GREEN}Compiled file: '{saveto}'")
+                else:
+                    MakeCake.mcake(MakeCake.rainbow("Happy bday!!!"))
+            else:
+                if args.troll:
+                    print(f"{colorama.Fore.RED}Failed to compile your code. U R FUCKING VIBECODER!")
+                else:
+                    print(f"{colorama.Fore.RED}Failed to compile generated code.")
+        finally:
+            if os.path.exists(temp_c_file):
+                os.remove(temp_c_file)import os
+from datetime import *
+import subprocess
+import sys
 import re
 import argparse
 import MakeCake
