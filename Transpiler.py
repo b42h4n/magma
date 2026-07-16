@@ -99,7 +99,7 @@ ccode = [
 "    *dest = '\\0';",
 '}',
 '}',
-'int main() {',
+'str main() {',
 ]
 
 
@@ -457,13 +457,7 @@ def translate(line, depth=1):
     m = RETURN_RE.match(line)
     if m:
         value = m.group(1)
-        if value == "true":
-            result = "1"
-        elif value == "false":
-            result = "0"
-        else:
-            result = value
-        ccode.append(f'{indent}return {result};')
+        ccode.append(f'{indent}return "{value}";')
         return 0
 
     m = COMM_RE.match(line)
