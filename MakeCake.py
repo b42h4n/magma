@@ -6,7 +6,7 @@ def rgb(r, g, b):
 def rainbow(text):
     rainbowtext=""
     col=0
-    colors=[rgb(255, 0, 0), rgb(255,165,0), rgb(255,255,0), rgb(0, 255, 0), rgb(0, 255, 255), rgb(0, 105, 255), rgb(159, 43, 104)]
+    colors=[rgb(255, 0, 0), rgb(255,165,0), rgb(255,255,0), rgb(0, 255, 0), rgb(0, 255, 255), rgb(0, 105, 255), rgb(198, 0, 106)]
     for i in text:
         rainbowtext+=f"{colors[col]}{i}"
         col+=1
