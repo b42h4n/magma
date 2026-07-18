@@ -547,7 +547,7 @@ def translate(line, depth=1):
         condition = convert_condition(condition, indent)
         if not check_expr_vars(condition, line):
             return 1
-        ccode.append(f"{indent}if ({condition}) {{")
+        ccode.append(f"{indent}while ({condition}) {{")
 
         declared_vars_stack.append({})
         inner_error = 0
