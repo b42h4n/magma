@@ -14,8 +14,7 @@ except ModuleNotFoundError:
 
 colorama.init()
 
-ver = "1.1.10"
-BUFFER_SIZE = 256
+ver = "1.1.11"
 
 def is_float(value):
     try:
