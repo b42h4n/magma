@@ -2,6 +2,8 @@ import re
 import colorama
 import argparse
 
+BUFFER_SIZE = 256
+
 def arguments():
     parser = argparse.ArgumentParser(description="Argument check")
     parser.add_argument('filename', nargs='?', default=None)
@@ -11,6 +13,9 @@ def arguments():
     
     args = parser.parse_args()
     return args
+
+args=arguments()
+file = "main" if not args.filename else args.filename
 
 ccode = [
 '#include <stdio.h>',
@@ -99,7 +104,7 @@ ccode = [
 "    *dest = '\\0';",
 '}',
 '}',
-'str main() {',
+'char* main() {',
 ]
 
 
@@ -141,6 +146,7 @@ BOOL_RE = re.compile(r'^\s*bool\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(true|false)\s*
 # Structs
 IF_RE = re.compile(r'^\s*if\s*\(\s*(.+?)\s*\)\s*\{(.*)\}\s*$', re.DOTALL)
 WHILE_RE = re.compile(r'^\s*while\s*\(\s*(.+?)\s*\)\s*\{(.*)\}\s*$', re.DOTALL)
+FUNC_RE = re.compile(r'^\s*while\s*\(\s*(.+?)\s*\)\s*\{(.*)\}\s*$', re.DOTALL)
 #Helpers
 ASSIGN_STR_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*"((?:[^"\\]|\\.)*)"\s*$')
 ASSIGN_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)\s*$')
