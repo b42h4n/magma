@@ -385,6 +385,19 @@ def strip_outer_parens(s):
             break
     return s
 
+def getype(input):
+    match input:
+        case "str":
+            return "char*"
+        case "int":
+            return "int"
+        case "float":
+            return "float"
+        case "bool":
+            return "bool"
+        case _:
+            return "err"
+
 def translate(line, depth=1):
     global anon_var_count
     line = line.strip()
@@ -552,7 +565,6 @@ def translate(line, depth=1):
         ccode.append(f"{indent}}}")
         return inner_error
 
-    # ОБРАБОТКА ФУНКЦИЙ С ПОДДЕРЖКОЙ MAIN
     m = FUNC_RE.match(line)
     if m:
         func_name = m.group(1)
@@ -569,9 +581,6 @@ def translate(line, depth=1):
         for inner_stmt in split_statements(body):
             if translate(inner_stmt, depth + 1) != 0:
                 inner_error = 1
-        
-        if func_name == "main":
-            ccode.append(f"{indent}    return 0;")
 
         declared_vars_stack.pop()
 
