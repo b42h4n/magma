@@ -1,21 +1,9 @@
 import re
-import colorama
 import argparse
+import colorama
 
 BUFFER_SIZE = 256
-
-def arguments():
-    parser = argparse.ArgumentParser(description="Argument check")
-    parser.add_argument('filename', nargs='?', default=None)
-    parser.add_argument('-o', help="output file name")
-    parser.add_argument('-b', action='store_true', help="birthday mode!")
-    parser.add_argument('--troll', action='store_true', help="trolling mode")
-    
-    args = parser.parse_args()
-    return args
-
-args=arguments()
-file = "main" if not args.filename else args.filename
+file = "main"
 
 ccode = [
 '#include <stdio.h>',
@@ -99,13 +87,12 @@ ccode = [
 '        a++; b++;',
 '    }',
 '    return *a == *b;',
+'}', # <-- ТУТ НЕ ХВАТАЛО ЗАКРЫВАЮЩЕЙ СКОБКИ СИ
 'void str_copy(char *dest, const char *src) {',
 '    while (*src) { *dest = *src; dest++; src++; }',
 "    *dest = '\\0';",
 '}',
-'}',
 ]
-
 
 HOIST_INSERT_INDEX = len(ccode)
 
@@ -145,7 +132,8 @@ BOOL_RE = re.compile(r'^\s*bool\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(true|false)\s*
 # Structs
 IF_RE = re.compile(r'^\s*if\s*\(\s*(.+?)\s*\)\s*\{(.*)\}\s*$', re.DOTALL)
 WHILE_RE = re.compile(r'^\s*while\s*\(\s*(.+?)\s*\)\s*\{(.*)\}\s*$', re.DOTALL)
-FUNC_RE = re.compile(r'^\s*while\s*\(\s*(.+?)\s*\)\s*\{(.*)\}\s*$', re.DOTALL)
+FUNC_RE = re.compile(r'^\s*func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\((.*?)\)\s*\{(.*)\}\s*$', re.DOTALL)
+
 #Helpers
 ASSIGN_STR_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*"((?:[^"\\]|\\.)*)"\s*$')
 ASSIGN_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)\s*$')
@@ -444,8 +432,8 @@ def translate(line, depth=1):
             return 1
         if not check_expr_vars(expr, line):
             return 1
-        declare_var_in_current_scope(namevar, "str")
-        ccode.append(f'{indent}char {namevar}[{BUFFER_SIZE}] = "{value}";')
+        declare_var_in_current_scope(namevar, "float")
+        ccode.append(f'{indent}float {namevar} = {expr};')
         return 0
 
     m = STR_RE.match(line)
@@ -456,7 +444,7 @@ def translate(line, depth=1):
             print(f"Error in {colorama.Fore.MAGENTA}{file}{colorama.Fore.RESET}:\n{colorama.Fore.MAGENTA}  Redefinition Error{colorama.Fore.RESET}: variable '{colorama.Fore.RED}{namevar}{colorama.Fore.RESET}' already declared in this scope")
             return 1
         declare_var_in_current_scope(namevar, "str")
-        ccode.append(f'{indent}char {namevar} = "{value}";')
+        ccode.append(f'{indent}char {namevar}[{BUFFER_SIZE}] = "{value}";')
         return 0
 
     m = RETURN_RE.match(line)
@@ -564,17 +552,27 @@ def translate(line, depth=1):
         ccode.append(f"{indent}}}")
         return inner_error
 
+    # ОБРАБОТКА ФУНКЦИЙ С ПОДДЕРЖКОЙ MAIN
     m = FUNC_RE.match(line)
     if m:
-        argument = m.group(1)
-        argument = convert_condition(argument, indent)
-        ccode.append(f"{indent}char* ({argument}) {{")
+        func_name = m.group(1)
+        args_str = m.group(2)
+        body = m.group(3)
+
+        if func_name == "main":
+            ccode.append(f"{indent}int main() {{")
+        else:
+            ccode.append(f"{indent}void {func_name}() {{")
 
         declared_vars_stack.append({})
         inner_error = 0
         for inner_stmt in split_statements(body):
             if translate(inner_stmt, depth + 1) != 0:
                 inner_error = 1
+        
+        if func_name == "main":
+            ccode.append(f"{indent}    return 0;")
+
         declared_vars_stack.pop()
 
         ccode.append(f"{indent}}}")
