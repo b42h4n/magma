@@ -104,7 +104,6 @@ ccode = [
 "    *dest = '\\0';",
 '}',
 '}',
-'char* main() {',
 ]
 
 
@@ -554,6 +553,22 @@ def translate(line, depth=1):
         if not check_expr_vars(condition, line):
             return 1
         ccode.append(f"{indent}while ({condition}) {{")
+
+        declared_vars_stack.append({})
+        inner_error = 0
+        for inner_stmt in split_statements(body):
+            if translate(inner_stmt, depth + 1) != 0:
+                inner_error = 1
+        declared_vars_stack.pop()
+
+        ccode.append(f"{indent}}}")
+        return inner_error
+
+    m = FUNC_RE.match(line)
+    if m:
+        argument = m.group(1)
+        argument = convert_condition(argument, indent)
+        ccode.append(f"{indent}char* ({argument}) {{")
 
         declared_vars_stack.append({})
         inner_error = 0

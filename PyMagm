@@ -9,12 +9,12 @@ from Transpiler import *
 try:
     import colorama
 except ModuleNotFoundError:
-    os.system("pip install colorama --break-system-packages")
+    subprocess.run(["pip", "install", "colorama", "--break-system-packages"])
     import colorama
 
 colorama.init()
 
-ver = "1.1.11"
+ver = "1.2"
 
 def is_float(value):
     try:
@@ -70,8 +70,6 @@ if error_occurred:
         print(f"{colorama.Fore.RED}READ A DOCS, U FUCKING DUMBASS!")
     else:
         print(f"{colorama.Fore.RED}Compilation error.")
-else:
-    ccode.append("}")
 
     saveto = args.o
     if not saveto:
