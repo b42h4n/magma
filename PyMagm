@@ -3,8 +3,33 @@ from datetime import *
 import subprocess
 import sys
 import argparse
-import MakeCake
 import Transpiler
+import colorama
+
+def rgb(r, g, b):
+    return f"\033[38;2;{r};{g};{b}m"
+
+def rainbow(text):
+    rainbowtext=""
+    col=0
+    colors=[rgb(255, 0, 0), rgb(255,165,0), rgb(255,255,0), rgb(0, 255, 0), rgb(0, 255, 255), rgb(0, 105, 255), rgb(198, 0, 106)]
+    for i in text:
+        rainbowtext+=f"{colors[col]}{i}"
+        col+=1
+        if col >= 7:
+            col=0
+    return rainbowtext
+
+def mcake(congrats):
+    print(f"""{colorama.Fore.RED}⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢀⡞⣧⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀{colorama.Fore.WHITE}⣀⣀⣀{colorama.Fore.RED}⣳⣋{colorama.Fore.WHITE}⣀⣀⡀⠀⠀⠀
+{colorama.Fore.WHITE}⠀⠀⠀⢸⡿⢯⣍⡉⣉⣩⠿⢻⠀⠀⠀
+⠀⠀⣤⡼⠧⠤⠬⠭⠭⠤⠤⠼⣤⡄⠀{rgb(142,102,68)}
+⠀⠀⣿⣠⣤⣰⣆⣠⣄⣴⣀⣶⣠⡇⠀
+⠀ {rgb(142,102,68)}⣿⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀{rgb(142,102,68)}⡇
+{congrats}""")
+
 
 try:
     import colorama
@@ -97,7 +122,7 @@ else:
             if not args.b:
                 print(f"{colorama.Fore.GREEN}Compiled file: '{saveto}'")
             else:
-                MakeCake.mcake(MakeCake.rainbow("Happy bday!!!"))
+                mcake(mcake.rainbow("Happy bday!!!"))
         else:
             if args.troll:
                 print(f"{colorama.Fore.RED}Failed to compile your code. U R FUCKING VIBECODER!")
